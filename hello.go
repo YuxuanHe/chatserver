@@ -39,77 +39,79 @@ func ConnectionHandler(conn net.Conn, messages chan string, client_add chan<- Cl
 			messages <- receiveStr
 		}
 	}()
+
+
 }
 
 func BroadcastHandler( messages chan string, client_add <-chan Client) {
     var conns = make(map[string]net.Conn)
     for {
 
-		select {
-		case msg := <-messages:
-			reg1 := regexp.MustCompile(`^\d:`)
-			reg2 := regexp.MustCompile(`^chitter:`)
-			reg3 := regexp.MustCompile(`^all:`)
-			reg4 := regexp.MustCompile(`^all :`)
-			if len(reg1.FindAllString(string(msg[3:]), -1)) > 0 {
-                 _, ok := conns[string(msg[3])]
-                if ok == false {
-                    fmt.Println("Wrong client number, try again")
-					continue
-					//os.Exit(1);
-				}
-                _, err := conns[string(msg[3])].Write([]byte(msg[0:3]+ msg[6:]))
-				if err != nil {
-					fmt.Println("Someone left the chat room")
-					delete(conns, string(msg[3]))
-				}
-			} else if len(reg2.FindAllString(string(msg), -1)) > 0 {
-				_, err := conns[string(msg[9])].Write([]byte(msg))
-				if err != nil {
-					fmt.Println("Someone left the chat room")
-					delete(conns, string(msg[9]))
-				}
-
-			} else if len(reg3.FindAllString(string(msg[3:]), -1)) > 0 {
-				msg = msg[0:3] + msg[8:]
-				for key, value := range conns {
-					_, err := value.Write([]byte(msg))
+			select {
+			case msg := <-messages:
+				reg1 := regexp.MustCompile(`^\d:`)
+				reg2 := regexp.MustCompile(`^chitter:`)
+				reg3 := regexp.MustCompile(`^all:`)
+				reg4 := regexp.MustCompile(`^all :`)
+				if len(reg1.FindAllString(string(msg[3:]), -1)) > 0 {
+	                 _, ok := conns[string(msg[3])]
+	                if ok == false {
+	                    fmt.Println("Wrong client number, try again")
+						continue
+						//os.Exit(1);
+					}
+	                _, err := conns[string(msg[3])].Write([]byte(msg[0:3]+ msg[6:]))
 					if err != nil {
 						fmt.Println("Someone left the chat room")
-						delete(conns, key)
+						delete(conns, string(msg[3]))
 					}
-
-				}
-
-			} else if len(reg4.FindAllString(string(msg[3:]), -1)) > 0 {
-				msg = msg[0:3] + msg[9:]
-				for key, value := range conns {
-					_, err := value.Write([]byte(msg))
+				} else if len(reg2.FindAllString(string(msg), -1)) > 0 {
+					_, err := conns[string(msg[9])].Write([]byte(msg))
 					if err != nil {
 						fmt.Println("Someone left the chat room")
-						delete(conns, key)
+						delete(conns, string(msg[9]))
 					}
 
-				}
+				} else if len(reg3.FindAllString(string(msg[3:]), -1)) > 0 {
+					msg = msg[0:3] + msg[8:]
+					for key, value := range conns {
+						_, err := value.Write([]byte(msg))
+						if err != nil {
+							fmt.Println("Someone left the chat room")
+							delete(conns, key)
+						}
 
-			} else {
-				for key, value := range conns {
-					_, err := value.Write([]byte(msg))
-					if err != nil {
-						fmt.Println("Someone left the chat room")
-						delete(conns, key)
 					}
 
+				} else if len(reg4.FindAllString(string(msg[3:]), -1)) > 0 {
+					msg = msg[0:3] + msg[9:]
+					for key, value := range conns {
+						_, err := value.Write([]byte(msg))
+						if err != nil {
+							fmt.Println("Someone left the chat room")
+							delete(conns, key)
+						}
+
+					}
+
+				} else {
+					for key, value := range conns {
+						_, err := value.Write([]byte(msg))
+						if err != nil {
+							fmt.Println("Someone left the chat room")
+							delete(conns, key)
+						}
+
+					}
 				}
+			case client := <-client_add:
+
+	      conns[client.client_id] = client.conn
+	      fmt.Println("Welcome to the chat room")
+
+
+
 			}
-		case client := <-client_add:
-
-            conns[client.client_id] = client.conn
-            fmt.Println("Welcome to the chat room")
-
-
-
-		}
 	}
 
 }
