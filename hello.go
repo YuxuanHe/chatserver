@@ -26,7 +26,6 @@ func ConnectionHandler(conn net.Conn, messages chan string, client_add chan<- Cl
 		for {
 			line, err := b.ReadBytes('\n')
 			if err != nil {
-				//conn.Close()
 				break
 			}
 			reg := regexp.MustCompile(`^whoami:`)
@@ -50,27 +49,29 @@ func BroadcastHandler( messages chan string, client_add <-chan Client, client_rm
     for {
 
 			select {
+				//Three cases: incoming message, client in, client out
 			case msg := <-messages:
+			//handle message income
 				reg1 := regexp.MustCompile(`^\d:`)
 				reg2 := regexp.MustCompile(`^chitter:`)
 				reg3 := regexp.MustCompile(`^all:`)
 				reg4 := regexp.MustCompile(`^all :`)
+				// Using regualr expression, it might be a bit complecated, but it works
 				if len(reg1.FindAllString(string(msg[3:]), -1)) > 0 {
 	                 _, ok := conns[string(msg[3])]
 	                if ok == false {
-	                    fmt.Println("Wrong client number, try again")
+											conns[string(msg[0])].Write([]byte("Client not exist, try again please\n"))
 						continue
-						//os.Exit(1);
 					}
 	                _, err := conns[string(msg[3])].Write([]byte(msg[0:3]+ msg[6:]))
 					if err != nil {
-						fmt.Println("Someone left the chat room")
+						fmt.Println("Seems wrong.......")
 						delete(conns, string(msg[3]))
 					}
 				} else if len(reg2.FindAllString(string(msg), -1)) > 0 {
 					_, err := conns[string(msg[9])].Write([]byte(msg))
 					if err != nil {
-						fmt.Println("Someone left the chat room")
+						fmt.Println("Seems wrong.......")
 						delete(conns, string(msg[9]))
 					}
 
@@ -79,7 +80,7 @@ func BroadcastHandler( messages chan string, client_add <-chan Client, client_rm
 					for key, value := range conns {
 						_, err := value.Write([]byte(msg))
 						if err != nil {
-							fmt.Println("Someone left the chat room")
+							fmt.Println("")
 							delete(conns, key)
 						}
 
@@ -90,7 +91,7 @@ func BroadcastHandler( messages chan string, client_add <-chan Client, client_rm
 					for key, value := range conns {
 						_, err := value.Write([]byte(msg))
 						if err != nil {
-							fmt.Println("Someone left the chat room")
+							fmt.Println("Seems wrong.......")
 							delete(conns, key)
 						}
 
@@ -100,17 +101,20 @@ func BroadcastHandler( messages chan string, client_add <-chan Client, client_rm
 					for key, value := range conns {
 						_, err := value.Write([]byte(msg))
 						if err != nil {
-							fmt.Println("Someone left the chat room")
+							fmt.Println("Seems wrong.......")
 							delete(conns, key)
 						}
 
 					}
 				}
 			case client_in := <-client_add:
-
+				//handle client in
 	      conns[client_in.client_id] = client_in.conn
 	      fmt.Println("Client " + client_in.client_id + " join the chat room")
+
+
 			case client_out := <-client_rm:
+			//handle client out
 				fmt.Println("Client " + client_out + " left the chat room")
 				delete(conns, client_out)
 
