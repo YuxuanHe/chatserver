@@ -16,7 +16,7 @@ type Client struct {
 	client_id string
 }
 
-func ConnectionHandler(conn net.Conn, messages chan string, client_add chan<- Client) {
+func ConnectionHandler(conn net.Conn, messages chan string, client_add chan<- Client, client_rm chan<- string) {
 	client_id := <-idAssignmentChan
 	client_add <- Client{conn, client_id}
 
@@ -26,7 +26,7 @@ func ConnectionHandler(conn net.Conn, messages chan string, client_add chan<- Cl
 		for {
 			line, err := b.ReadBytes('\n')
 			if err != nil {
-				conn.Close()
+				//conn.Close()
 				break
 			}
 			reg := regexp.MustCompile(`^whoami:`)
@@ -38,12 +38,14 @@ func ConnectionHandler(conn net.Conn, messages chan string, client_add chan<- Cl
 			}
 			messages <- receiveStr
 		}
+		client_rm <- client_id
+		conn.Close()
 	}()
 
 
 }
 
-func BroadcastHandler( messages chan string, client_add <-chan Client) {
+func BroadcastHandler( messages chan string, client_add <-chan Client, client_rm <-chan string) {
     var conns = make(map[string]net.Conn)
     for {
 
@@ -104,11 +106,13 @@ func BroadcastHandler( messages chan string, client_add <-chan Client) {
 
 					}
 				}
-			case client := <-client_add:
+			case client_in := <-client_add:
 
-	      conns[client.client_id] = client.conn
-	      fmt.Println("Welcome to the chat room")
-
+	      conns[client_in.client_id] = client_in.conn
+	      fmt.Println("Client " + client_in.client_id + " join the chat room")
+			case client_out := <-client_rm:
+				fmt.Println("Client " + client_out + " left the chat room")
+				delete(conns, client_out)
 
 
 			}
@@ -142,8 +146,8 @@ func main() {
 	go IdManager()
 	messages := make(chan string, 10)
 	client_add := make(chan Client)
-
-	go BroadcastHandler(messages, client_add)
+	client_rm  := make(chan string)
+	go BroadcastHandler(messages, client_add, client_rm)
 	for {
 		conn, err := server.Accept()
 		if err != nil {
@@ -152,7 +156,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		go ConnectionHandler(conn, messages, client_add)
+		go ConnectionHandler(conn, messages, client_add, client_rm)
 
 	}
 
