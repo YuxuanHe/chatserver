@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 var idAssignmentChan = make(chan string)
@@ -31,7 +32,7 @@ func ConnectionHandler(conn net.Conn, messages chan string, client_add chan<- Cl
 			reg := regexp.MustCompile(`^whoami:`)
 			receiveStr := ""
 			if len(reg.FindAllString(string(line), -1)) > 0 {
-				receiveStr = "chitter: " + client_id + "\n"
+				receiveStr = "chitter: " + client_id
 			} else {
 				receiveStr = client_id + ": " + string(line)
 			}
@@ -52,61 +53,61 @@ func BroadcastHandler( messages chan string, client_add <-chan Client, client_rm
 				//Three cases: incoming message, client in, client out
 			case msg := <-messages:
 			//handle message income
-				reg1 := regexp.MustCompile(`^\d:`)
-				reg2 := regexp.MustCompile(`^chitter:`)
-				reg3 := regexp.MustCompile(`^all:`)
-				reg4 := regexp.MustCompile(`^all :`)
+				reg1 := regexp.MustCompile(`^chitter:`)
+				reg2 := regexp.MustCompile(`^all:`)
+				reg3 := regexp.MustCompile(`^all :`)
 				// Using regualr expression, it might be a bit complecated, but it works
-				if len(reg1.FindAllString(string(msg[3:]), -1)) > 0 {
-	                 _, ok := conns[string(msg[3])]
-	                if ok == false {
-											conns[string(msg[0])].Write([]byte("Client not exist, try again please\n"))
-						continue
-					}
-	                _, err := conns[string(msg[3])].Write([]byte(msg[0:3]+ msg[6:]))
-					if err != nil {
-						fmt.Println("Seems wrong.......")
-						delete(conns, string(msg[3]))
-					}
-				} else if len(reg2.FindAllString(string(msg), -1)) > 0 {
-					_, err := conns[string(msg[9])].Write([]byte(msg))
-					if err != nil {
-						fmt.Println("Seems wrong.......")
-						delete(conns, string(msg[9]))
-					}
 
-				} else if len(reg3.FindAllString(string(msg[3:]), -1)) > 0 {
-					msg = msg[0:3] + msg[8:]
+				pos := strings.Index(string(msg), ":")
+				if pos == -1 {
+					for key, value := range conns {
+						_, err := value.Write([]byte(msg))
+						if err != nil {
+							fmt.Println("Seems wrong.......")
+							delete(conns, key)
+						}
+
+					}
+				}  else if len(reg1.FindAllString(string(msg), -1)) > 0 {
+					_, err := conns[string(msg[9:])].Write([]byte(msg+"\n"))
+					if err != nil {
+						fmt.Println("Seems wrong.......")
+						delete(conns, string(msg[9:]))
+					}
+				} else if len(reg2.FindAllString(string(msg[strings.Index(string(msg),":")+2:]), -1)) > 0 {
+					msg = strings.Split(msg, ":")[0]+":"+strings.Split(msg, ":")[2]
 					for key, value := range conns {
 						_, err := value.Write([]byte(msg))
 						if err != nil {
 							fmt.Println("")
 							delete(conns, key)
 						}
-
 					}
-
-				} else if len(reg4.FindAllString(string(msg[3:]), -1)) > 0 {
-					msg = msg[0:3] + msg[9:]
-					for key, value := range conns {
-						_, err := value.Write([]byte(msg))
-						if err != nil {
-							fmt.Println("Seems wrong.......")
-							delete(conns, key)
-						}
-
-					}
-
-				} else {
-					for key, value := range conns {
-						_, err := value.Write([]byte(msg))
-						if err != nil {
-							fmt.Println("Seems wrong.......")
-							delete(conns, key)
-						}
-
+				} else if len(reg3.FindAllString(string(msg[strings.Index(string(msg),":")+2:]), -1)) > 0 {
+				msg = strings.Split(msg, ":")[0]+":"+strings.Split(msg, ":")[2]
+				for key, value := range conns {
+					_, err := value.Write([]byte(msg))
+					if err != nil {
+						fmt.Println("Seems wrong.......")
+						delete(conns, key)
 					}
 				}
+			} 	else  {
+	                 _, ok := conns[strings.Split(msg,": ")[1]]
+	                if ok == false {
+											conns[strings.Split(msg,": ")[0]].Write([]byte("Client not exist, try again please\n"))
+											continue
+										}
+	                _, err := conns[strings.Split(msg,": ")[1]].Write([]byte(strings.Split(msg, ":")[0]+":"+strings.Split(msg, ":")[2]))
+									if err != nil {
+											fmt.Println("Seems wrong.......")
+											delete(conns, strings.Split(msg,": ")[1])
+										}
+				}
+
+
+
+
 			case client_in := <-client_add:
 				//handle client in
 	      conns[client_in.client_id] = client_in.conn
@@ -148,7 +149,7 @@ func main() {
 
 	fmt.Println("Start my server")
 	go IdManager()
-	messages := make(chan string, 10)
+	messages := make(chan string, 20)
 	client_add := make(chan Client)
 	client_rm  := make(chan string)
 	go BroadcastHandler(messages, client_add, client_rm)
