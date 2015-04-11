@@ -58,7 +58,7 @@ func BroadcastHandler( messages chan string, client_add <-chan Client, client_rm
 				reg3 := regexp.MustCompile(`^all :`)
 				// Using regualr expression, it might be a bit complecated, but it works
 
-				pos := strings.Index(string(msg), ":")
+				pos := strings.Index(msg[strings.Index(msg, ":")+2:], ":")
 				if pos == -1 {
 					for key, value := range conns {
 						_, err := value.Write([]byte(msg))
